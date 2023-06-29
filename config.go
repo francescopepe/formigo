@@ -10,7 +10,6 @@ const (
 	defaultErrorThreshold       = 3
 	defaultErrorPeriod          = time.Second * 120
 	defaultRetrievers           = 1
-	defaultConsumers            = 1
 	defaultDeleterBufferSize    = 10
 	defaultDeleterBufferTimeout = time.Millisecond * 500
 )
@@ -52,10 +51,12 @@ type MultiMessageBufferConfiguration struct {
 }
 
 type SingleMessageConsumerConfiguration struct {
-	Handler SingleMessageHandler
+	Concurrency int
+	Handler     SingleMessageHandler
 }
 
 type MultiMessageConsumerConfiguration struct {
+	Concurrency  int
 	Handler      MultiMessageHandler
 	BufferConfig MultiMessageBufferConfiguration
 }
@@ -90,10 +91,6 @@ type WorkerConfiguration struct {
 func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
 	if config.Retrievers == 0 {
 		config.Retrievers = defaultRetrievers
-	}
-
-	if config.Consumers == 0 {
-		config.Consumers = defaultConsumers
 	}
 
 	if config.ErrorConfig.Threshold == 0 {

@@ -119,20 +119,19 @@ type BufferWithContextTimeout struct {
 func (b *BufferWithContextTimeout) Add(msg Message) {
 	if len(b.messages) == 0 {
 		// Set the context of the buffer to first message's context
-		b.ctx, b.cancelCtx = msg.Ctx, msg.CancelCtx
-	} else {
-		// TODO Not sure if this works
-		// Override the current cancelCtx in a way that cancels all
-		// the previous messages' contexts.
-		b.cancelCtx = func(cancel context.CancelFunc) context.CancelFunc {
-			return func() {
-				cancel()
-				msg.CancelCtx()
-			}
-		}(b.cancelCtx)
-
+		b.ctx = msg.Ctx
 	}
-	b.Add(msg)
+
+	// Override the current cancelCtx in a way that cancels all
+	// the previous messages' contexts.
+	b.cancelCtx = func(cancel context.CancelFunc) context.CancelFunc {
+		return func() {
+			cancel()
+			msg.CancelCtx()
+		}
+	}(b.cancelCtx)
+
+	b.Buffer.Add(msg)
 }
 
 // Reset resets its internal buffer, cancel the current context created and
@@ -142,10 +141,11 @@ func (b *BufferWithContextTimeout) Add(msg Message) {
 // NOTE: this function should be always called to clean up any buffer
 // created. Used in defer can guarantee that it always run.
 func (b *BufferWithContextTimeout) Reset() {
-	b.Reset()
+	b.Buffer.Reset()
 
 	b.cancelCtx()                // Be sure to reset any previous context
 	b.ctx = context.Background() // Create a context that doesn't expire
+	b.cancelCtx = func() {}
 }
 
 func (b *BufferWithContextTimeout) CtxExpired() <-chan struct{} {

@@ -11,7 +11,6 @@ import (
 
 type Worker struct {
 	client        client.Client
-	consumers     int
 	retrievers    int
 	errorConfig   ErrorConfiguration
 	consumer      consumer
@@ -33,10 +32,10 @@ func (w Worker) Run(ctx context.Context) error {
 	// Run retrievers and get the message channel
 	messageCh := w.runRetrievers(ctx, errorCh)
 
-	// Run consumers and get the deletion channel.
+	// Run consumer and get the deletion channel.
 	// Note that the context is not given to them because they will only stop once
 	// all the messages in the pipeline have been consumed.
-	deleteCh := w.runConsumers(errorCh, messageCh)
+	deleteCh := w.runConsumer(errorCh, messageCh)
 
 	// Run deleter.
 	// Note that the context is not given to the deleter because it will only stop once
@@ -89,24 +88,16 @@ func (w Worker) runRetrievers(ctx context.Context, errorCh chan<- error) <-chan 
 	return messageCh
 }
 
-// runConsumers runs a number of consumers based on the worker's configuration.
+// runConsumer runs the worker's consumer.
 // It returns a channel where the messages will be published for deletion and,
-// only when all the consumers have stopped, it will close it to broadcast the
+// only when the consumer has stopped, it will close it to broadcast the
 // signal to stop to the deleter.
-func (w Worker) runConsumers(errorCh chan<- error, messageCh <-chan messages.Message) <-chan messages.Message {
+func (w Worker) runConsumer(errorCh chan<- error, messageCh <-chan messages.Message) <-chan messages.Message {
 	deleteCh := make(chan messages.Message)
 
-	var wg sync.WaitGroup
-	wg.Add(w.consumers)
-	for i := 0; i < w.consumers; i++ {
-		go func() {
-			defer wg.Done()
-			w.consumer.consume(errorCh, messageCh, deleteCh)
-		}()
-	}
-
 	go func() {
-		wg.Wait()
+		w.consumer.consume(errorCh, messageCh, deleteCh)
+
 		close(deleteCh)
 	}()
 
@@ -118,7 +109,6 @@ func NewWorker(config WorkerConfiguration) Worker {
 
 	return Worker{
 		client:        config.Client,
-		consumers:     config.Consumers,
 		retrievers:    config.Retrievers,
 		errorConfig:   config.ErrorConfig,
 		consumer:      config.Consumer,

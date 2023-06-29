@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/francescopepe/go-queue-worker/internal/messages"
@@ -12,8 +13,25 @@ import (
 type SingleMessageHandler = func(ctx context.Context, msg interface{}) error
 type MultiMessageHandler = func(ctx context.Context, msgs []interface{}) error
 
+// This means that the buffered messages didn't get passed to the handler within
+// the first message's timeout.
+// This is generally due to:
+// - Visibility timeout of the messages too small
+// - Buffer timeout too high
+// - Consumer to slow
+var errBufferCtxExpired = errors.New("buffer context expired, buffer will Reset")
+
 type consumer interface {
 	consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
+}
+
+func makeAvailableConsumers(concurrency int) chan struct{} {
+	consumers := make(chan struct{}, concurrency)
+	for i := 0; i < concurrency; i++ {
+		consumers <- struct{}{}
+	}
+
+	return consumers
 }
 
 // wrapHandler catches any panic error, logs it and returns the error that generated it.
@@ -36,7 +54,8 @@ func wrapHandler(handler func() error) (err error) {
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
 type SingleMessageConsumer struct {
-	handler SingleMessageHandler
+	concurrency int
+	handler     SingleMessageHandler
 }
 
 func (c *SingleMessageConsumer) processMessage(errorCh chan<- error, msg messages.Message) error {
@@ -51,34 +70,54 @@ func (c *SingleMessageConsumer) processMessage(errorCh chan<- error, msg message
 // Consumes and deletes a single message, it stops only when the `messageCh` gets closed
 // and doesn't have any messages in it.
 func (c *SingleMessageConsumer) consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
-	// For each message, until closure
-	for msg := range messageCh {
-		err := c.processMessage(errorCh, msg)
-		if err != nil {
-			errorCh <- fmt.Errorf("failed to process message: %w", err)
-			continue
-		}
+	consumers := makeAvailableConsumers(c.concurrency)
 
-		// Push message for deletion
-		deleteCh <- msg
+	var wg sync.WaitGroup
+	for msg := range messageCh {
+		<-consumers // Use an available comsumer
+
+		wg.Add(1)
+		go func(message messages.Message) {
+			defer func() {
+				wg.Done()
+				consumers <- struct{}{} // Release consumer
+			}()
+
+			err := c.processMessage(errorCh, message)
+			if err != nil {
+				errorCh <- fmt.Errorf("failed to process message: %w", err)
+				return
+			}
+
+			// Push message for deletion
+			deleteCh <- message
+		}(msg)
 	}
+
+	wg.Wait()
 }
 
 func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *SingleMessageConsumer {
+	if config.Concurrency == 0 {
+		config.Concurrency = 1
+	}
+
 	return &SingleMessageConsumer{
-		handler: config.Handler,
+		concurrency: config.Concurrency,
+		handler:     config.Handler,
 	}
 }
 
 // MultiMessageConsumer allows to process multiple messages at a time. This can be useful
 // for batch updates or use cases with high throughput.
 type MultiMessageConsumer struct {
+	concurrency  int
 	handler      MultiMessageHandler
 	bufferConfig MultiMessageBufferConfiguration
 }
 
 // It processes the messages and push them downstream for deletion.
-func (c *MultiMessageConsumer) processMessages(errorCh chan<- error, deleteCh chan<- messages.Message, messages []messages.Message, ctx context.Context) {
+func (c *MultiMessageConsumer) processMessages(errorCh chan<- error, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
 	msgs := make([]interface{}, 0, len(messages))
 	for _, msg := range messages {
 		msgs = append(msgs, msg.Msg)
@@ -100,10 +139,9 @@ func (c *MultiMessageConsumer) processMessages(errorCh chan<- error, deleteCh ch
 // Consumes and deletes a number of messages in the interval [1, N] based on configuration
 // provided in the BufferConfiguration.
 // It stops only when the messageCh gets closed and doesn't have any messages in it.
-// This function uses two timeouts:
-//   - consumption timeout, set in the context
-//   - buffer timeout, used with the timeoutCh
 func (c *MultiMessageConsumer) consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+	consumers := makeAvailableConsumers(c.concurrency)
+
 	// Create buffer
 	buffer := messages.NewBufferWithContextTimeout(messages.BufferWithContextTimeoutConfiguration{
 		Size:          c.bufferConfig.Size,
@@ -111,50 +149,67 @@ func (c *MultiMessageConsumer) consume(errorCh chan<- error, messageCh <-chan me
 	})
 	defer buffer.Reset()
 
-	for {
-		select {
-		case msg, open := <-messageCh:
-			if !open {
-				// Message channel closed. This is the stop signal.
-				// Note: We can't return if the buffer contains messages to process.
-				// We MUST consume all the messages on the buffer
-				if buffer.IsEmpty() {
-					return // Buffer empty, we can stop
+	var wg sync.WaitGroup
+	func() {
+		for {
+			select {
+			case msg, open := <-messageCh:
+				if !open {
+					// Message channel closed. This is the stop signal.
+					// Note: We can't return if the buffer contains messages to process.
+					// We MUST consume all the messages on the buffer
+					if buffer.IsEmpty() {
+						return // Buffer empty, we can stop
+					}
+					break // Buffer contains messages, break the select
 				}
-				break // Buffer contains messages, break the select
+
+				// Add message to the buffer
+				buffer.Add(msg)
+
+				// If the buffer is not full, continue
+				if !buffer.IsFull() {
+					continue
+				}
+
+			case <-buffer.CtxExpired():
+				errorCh <- errBufferCtxExpired
+
+				// Reset the buffer.
+				buffer.Reset()
+				continue
+
+			case <-buffer.Expired():
+				// Timeout expired, process the buffer
 			}
 
-			// Add message to the buffer
-			buffer.Add(msg)
+			select {
+			case <-consumers: // Use an available comsumer
+			case <-buffer.CtxExpired():
+				errorCh <- errBufferCtxExpired
 
-			// If the buffer is not full, continue
-			if !buffer.IsFull() {
+				// Reset the buffer.
+				buffer.Reset()
 				continue
 			}
 
-		case <-buffer.CtxExpired():
-			// Context expired, Reset the buffer and raise an error.
-			// This means that the buffered messages didn't get passed to the handler within
-			// the first message's timeout.
-			// This is generally due to:
-			// - Visibility timeout of the messages too small
-			// - Buffer timeout too high
-			errorCh <- errors.New("buffer context timeout reached, buffer will Reset")
+			wg.Add(1)
+			go func(ctx context.Context, messages []messages.Message) {
+				defer func() {
+					wg.Done()
+					consumers <- struct{}{} // Release consumer
+				}()
 
-			// Reset the buffer.
+				// Process the messages
+				c.processMessages(errorCh, deleteCh, ctx, messages)
+			}(buffer.Context(), buffer.Messages())
+
+			// Reset buffer
 			buffer.Reset()
-			continue
-
-		case <-buffer.Expired():
-			// Timeout expired, process the buffer
 		}
+	}()
 
-		// Process the messages
-		c.processMessages(errorCh, deleteCh, buffer.Messages(), buffer.Context())
-
-		// Reset buffer
-		buffer.Reset()
-	}
+	wg.Wait()
 }
 
 func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *MultiMessageConsumer {
@@ -166,7 +221,12 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *MultiMes
 		config.BufferConfig.Timeout = time.Second
 	}
 
+	if config.Concurrency == 0 {
+		config.Concurrency = 1
+	}
+
 	return &MultiMessageConsumer{
+		concurrency:  config.Concurrency,
 		handler:      config.Handler,
 		bufferConfig: config.BufferConfig,
 	}
