@@ -10,7 +10,7 @@ import (
 const (
 	defaultErrorThreshold       = 3
 	defaultErrorPeriod          = time.Second * 120
-	defaultConccurency          = 1
+	defaultConcurrency          = 1
 	defaultRetrievers           = 1
 	defaultDeleterBufferSize    = 10
 	defaultDeleterBufferTimeout = time.Millisecond * 500
@@ -53,15 +53,15 @@ type MultiMessageBufferConfiguration struct {
 }
 
 type SingleMessageConsumerConfiguration struct {
-	Handler SingleMessageHandler
+	Handler singleMessageHandler
 }
 
 type MultiMessageConsumerConfiguration struct {
-	Handler      MultiMessageHandler
+	Handler      multiMessageHandler
 	BufferConfig MultiMessageBufferConfiguration
 }
 
-type WorkerConfiguration struct {
+type Configuration struct {
 	// A queue client
 	Client client.Client
 
@@ -88,13 +88,13 @@ type WorkerConfiguration struct {
 	DeleterConfig DeleterConfiguration
 }
 
-func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
+func setWorkerConfigValues(config Configuration) Configuration {
 	if config.Retrievers == 0 {
 		config.Retrievers = defaultRetrievers
 	}
 
 	if config.Concurrency == 0 {
-		config.Concurrency = defaultConccurency
+		config.Concurrency = defaultConcurrency
 	}
 
 	if config.ErrorConfig.Threshold == 0 {
