@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"log"
 	"time"
 
 	"github.com/francescopepe/go-queue-worker/internal/client"
@@ -31,8 +32,8 @@ type ErrorConfiguration struct {
 	// Default: 120s.
 	Period time.Duration
 
-	// The error reporter
-	Reporter ErrorReporter
+	// The error report function
+	ReportFunc func(err error)
 }
 
 // The MultiMessageBufferConfiguration defines a buffer which is consumed by the worker when either
@@ -101,8 +102,10 @@ func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
 		config.ErrorConfig.Period = defaultErrorPeriod
 	}
 
-	if config.ErrorConfig.Reporter == nil {
-		config.ErrorConfig.Reporter = NewDefaultErrorReporter()
+	if config.ErrorConfig.ReportFunc == nil {
+		config.ErrorConfig.ReportFunc = func(err error) {
+			og.Println("ERROR", err)
+		}
 	}
 
 	if config.DeleterConfig.BufferSize == 0 {
