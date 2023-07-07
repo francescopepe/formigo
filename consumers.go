@@ -177,7 +177,7 @@ func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, me
 			}
 
 			select {
-			case <-consumers: // Use an available comsumer
+			case <-consumers: // Use an available consumer
 			case <-buffer.CtxExpired():
 				errorCh <- errBufferCtxExpired
 
@@ -186,16 +186,19 @@ func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, me
 				continue
 			}
 
+			ctx, cancelCtx := buffer.PullContext()
+
 			wg.Add(1)
-			go func(ctx context.Context, messages []messages.Message) {
+			go func(ctx context.Context, ctxCancelFunc context.CancelFunc, msgs []messages.Message) {
 				defer func() {
 					wg.Done()
 					consumers <- struct{}{} // Release consumer
+					ctxCancelFunc()         // Cancel context
 				}()
 
 				// Process the messages
-				c.processMessages(errorCh, deleteCh, ctx, messages)
-			}(buffer.Context(), buffer.Messages())
+				c.processMessages(errorCh, deleteCh, ctx, msgs)
+			}(ctx, cancelCtx, buffer.Messages())
 
 			// Reset buffer
 			buffer.Reset()

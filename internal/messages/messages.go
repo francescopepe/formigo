@@ -156,6 +156,15 @@ func (b *BufferWithContextTimeout) Context() context.Context {
 	return b.ctx
 }
 
+func (b *BufferWithContextTimeout) PullContext() (context.Context, context.CancelFunc) {
+	ctx, cancelCtx := b.ctx, b.cancelCtx
+
+	b.ctx = context.Background() // Create a context that doesn't expire
+	b.cancelCtx = func() {}
+
+	return ctx, cancelCtx
+}
+
 func NewBufferWithContextTimeout(config BufferWithContextTimeoutConfiguration) *BufferWithContextTimeout {
 	return &BufferWithContextTimeout{
 		Buffer: NewMessageBuffer(BufferConfiguration{
