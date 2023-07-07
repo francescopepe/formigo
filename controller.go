@@ -54,7 +54,7 @@ func (c *defaultController) run(stopFunc context.CancelCauseFunc, errorCh <-chan
 				return // Stop signal received
 			}
 
-			c.errorConfig.Reporter.Report(err)
+			c.errorConfig.ReportFunc(err)
 			c.increaseCounter()
 
 			if c.shouldStop() {
