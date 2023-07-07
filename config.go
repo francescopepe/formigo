@@ -10,6 +10,7 @@ import (
 const (
 	defaultErrorThreshold       = 3
 	defaultErrorPeriod          = time.Second * 120
+	defaultConccurency          = 1
 	defaultRetrievers           = 1
 	defaultDeleterBufferSize    = 10
 	defaultDeleterBufferTimeout = time.Millisecond * 500
@@ -52,12 +53,10 @@ type MultiMessageBufferConfiguration struct {
 }
 
 type SingleMessageConsumerConfiguration struct {
-	Concurrency int
-	Handler     SingleMessageHandler
+	Handler SingleMessageHandler
 }
 
 type MultiMessageConsumerConfiguration struct {
-	Concurrency  int
 	Handler      MultiMessageHandler
 	BufferConfig MultiMessageBufferConfiguration
 }
@@ -66,11 +65,11 @@ type WorkerConfiguration struct {
 	// A queue client
 	Client client.Client
 
-	// Number of Go routines that process messages from the Queue.
+	// Number of Go routines that process the messages from the Queue.
 	// The higher this value, the more Go routines are spawned to process the messages.
 	// Using a high value can be useful when the Handler of the consumer perform slow I/O operations.
 	// Default: 1.
-	Consumers int
+	Concurrency int
 
 	// Number of Go routines that retrieve messages from the Queue.
 	// The higher this value, the more Go routines are spawned to read the messages from the
@@ -94,6 +93,10 @@ func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
 		config.Retrievers = defaultRetrievers
 	}
 
+	if config.Concurrency == 0 {
+		config.Concurrency = defaultConccurency
+	}
+
 	if config.ErrorConfig.Threshold == 0 {
 		config.ErrorConfig.Threshold = defaultErrorThreshold
 	}
@@ -104,7 +107,7 @@ func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
 
 	if config.ErrorConfig.ReportFunc == nil {
 		config.ErrorConfig.ReportFunc = func(err error) {
-			og.Println("ERROR", err)
+			log.Println("ERROR", err)
 		}
 	}
 

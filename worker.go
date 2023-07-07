@@ -9,15 +9,16 @@ import (
 	"github.com/francescopepe/go-queue-worker/internal/messages"
 )
 
-type Worker struct {
+type worker struct {
 	client        client.Client
+	concurrency   int
 	retrievers    int
 	errorConfig   ErrorConfiguration
 	consumer      consumer
 	deleterConfig DeleterConfiguration
 }
 
-func (w Worker) Run(ctx context.Context) error {
+func (w worker) Run(ctx context.Context) error {
 	errorCh := make(chan error)
 	defer close(errorCh) // Close errorCh to stop controller
 
@@ -68,7 +69,7 @@ func (w Worker) Run(ctx context.Context) error {
 // It returns a channel where the messages will be published and, only when all the
 // retrievers have stopped, it will close it to broadcast the signal to stop to the
 // consumers.
-func (w Worker) runRetrievers(ctx context.Context, errorCh chan<- error) <-chan messages.Message {
+func (w worker) runRetrievers(ctx context.Context, errorCh chan<- error) <-chan messages.Message {
 	messageCh := make(chan messages.Message)
 
 	var wg sync.WaitGroup
@@ -92,11 +93,11 @@ func (w Worker) runRetrievers(ctx context.Context, errorCh chan<- error) <-chan 
 // It returns a channel where the messages will be published for deletion and,
 // only when the consumer has stopped, it will close it to broadcast the
 // signal to stop to the deleter.
-func (w Worker) runConsumer(errorCh chan<- error, messageCh <-chan messages.Message) <-chan messages.Message {
+func (w worker) runConsumer(errorCh chan<- error, messageCh <-chan messages.Message) <-chan messages.Message {
 	deleteCh := make(chan messages.Message)
 
 	go func() {
-		w.consumer.consume(errorCh, messageCh, deleteCh)
+		w.consumer.consume(w.concurrency, errorCh, messageCh, deleteCh)
 
 		close(deleteCh)
 	}()
@@ -104,11 +105,12 @@ func (w Worker) runConsumer(errorCh chan<- error, messageCh <-chan messages.Mess
 	return deleteCh
 }
 
-func NewWorker(config WorkerConfiguration) Worker {
+func NewWorker(config WorkerConfiguration) worker {
 	config = setWorkerConfigValues(config)
 
 	return Worker{
 		client:        config.Client,
+		concurrency:   config.Concurrency,
 		retrievers:    config.Retrievers,
 		errorConfig:   config.ErrorConfig,
 		consumer:      config.Consumer,

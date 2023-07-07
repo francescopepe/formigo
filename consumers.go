@@ -22,7 +22,7 @@ type MultiMessageHandler = func(ctx context.Context, msgs []interface{}) error
 var errBufferCtxExpired = errors.New("buffer context expired, buffer will Reset")
 
 type consumer interface {
-	consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
+	consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
 }
 
 func makeAvailableConsumers(concurrency int) chan struct{} {
@@ -49,16 +49,15 @@ func wrapHandler(handler func() error) (err error) {
 	return err
 }
 
-// SingleMessageConsumer defines a message handler that consumes only one message at a
+// singleMessageConsumer defines a message handler that consumes only one message at a
 // time.
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
-type SingleMessageConsumer struct {
-	concurrency int
-	handler     SingleMessageHandler
+type singleMessageConsumer struct {
+	handler SingleMessageHandler
 }
 
-func (c *SingleMessageConsumer) processMessage(errorCh chan<- error, msg messages.Message) error {
+func (c *singleMessageConsumer) processMessage(errorCh chan<- error, msg messages.Message) error {
 	defer msg.CancelCtx() // This must be called to release resources associated with the context.
 
 	// Process Message
@@ -69,8 +68,8 @@ func (c *SingleMessageConsumer) processMessage(errorCh chan<- error, msg message
 
 // Consumes and deletes a single message, it stops only when the `messageCh` gets closed
 // and doesn't have any messages in it.
-func (c *SingleMessageConsumer) consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
-	consumers := makeAvailableConsumers(c.concurrency)
+func (c *singleMessageConsumer) consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+	consumers := makeAvailableConsumers(concurrency)
 
 	var wg sync.WaitGroup
 	for msg := range messageCh {
@@ -97,27 +96,21 @@ func (c *SingleMessageConsumer) consume(errorCh chan<- error, messageCh <-chan m
 	wg.Wait()
 }
 
-func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *SingleMessageConsumer {
-	if config.Concurrency == 0 {
-		config.Concurrency = 1
-	}
-
-	return &SingleMessageConsumer{
-		concurrency: config.Concurrency,
-		handler:     config.Handler,
+func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *singleMessageConsumer {
+	return &singleMessageConsumer{
+		handler: config.Handler,
 	}
 }
 
-// MultiMessageConsumer allows to process multiple messages at a time. This can be useful
+// multiMessageConsumer allows to process multiple messages at a time. This can be useful
 // for batch updates or use cases with high throughput.
-type MultiMessageConsumer struct {
-	concurrency  int
+type multiMessageConsumer struct {
 	handler      MultiMessageHandler
 	bufferConfig MultiMessageBufferConfiguration
 }
 
 // It processes the messages and push them downstream for deletion.
-func (c *MultiMessageConsumer) processMessages(errorCh chan<- error, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
+func (c *multiMessageConsumer) processMessages(errorCh chan<- error, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
 	msgs := make([]interface{}, 0, len(messages))
 	for _, msg := range messages {
 		msgs = append(msgs, msg.Msg)
@@ -139,8 +132,8 @@ func (c *MultiMessageConsumer) processMessages(errorCh chan<- error, deleteCh ch
 // Consumes and deletes a number of messages in the interval [1, N] based on configuration
 // provided in the BufferConfiguration.
 // It stops only when the messageCh gets closed and doesn't have any messages in it.
-func (c *MultiMessageConsumer) consume(errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
-	consumers := makeAvailableConsumers(c.concurrency)
+func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+	consumers := makeAvailableConsumers(concurrency)
 
 	// Create buffer
 	buffer := messages.NewBufferWithContextTimeout(messages.BufferWithContextTimeoutConfiguration{
@@ -212,7 +205,7 @@ func (c *MultiMessageConsumer) consume(errorCh chan<- error, messageCh <-chan me
 	wg.Wait()
 }
 
-func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *MultiMessageConsumer {
+func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *multiMessageConsumer {
 	if config.BufferConfig.Size == 0 {
 		config.BufferConfig.Size = 10
 	}
@@ -221,12 +214,7 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *MultiMes
 		config.BufferConfig.Timeout = time.Second
 	}
 
-	if config.Concurrency == 0 {
-		config.Concurrency = 1
-	}
-
-	return &MultiMessageConsumer{
-		concurrency:  config.Concurrency,
+	return &multiMessageConsumer{
 		handler:      config.Handler,
 		bufferConfig: config.BufferConfig,
 	}
@@ -234,6 +222,6 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *MultiMes
 
 // Interface guards
 var (
-	_ consumer = (*SingleMessageConsumer)(nil)
-	_ consumer = (*MultiMessageConsumer)(nil)
+	_ consumer = (*singleMessageConsumer)(nil)
+	_ consumer = (*multiMessageConsumer)(nil)
 )
