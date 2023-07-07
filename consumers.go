@@ -10,8 +10,8 @@ import (
 	"github.com/francescopepe/go-queue-worker/internal/messages"
 )
 
-type SingleMessageHandler = func(ctx context.Context, msg interface{}) error
-type MultiMessageHandler = func(ctx context.Context, msgs []interface{}) error
+type singleMessageHandler = func(ctx context.Context, msg interface{}) error
+type multiMessageHandler = func(ctx context.Context, msgs []interface{}) error
 
 // This means that the buffered messages didn't get passed to the handler within
 // the first message's timeout.
@@ -54,7 +54,7 @@ func wrapHandler(handler func() error) (err error) {
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
 type singleMessageConsumer struct {
-	handler SingleMessageHandler
+	handler singleMessageHandler
 }
 
 func (c *singleMessageConsumer) processMessage(errorCh chan<- error, msg messages.Message) error {
@@ -105,7 +105,7 @@ func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *single
 // multiMessageConsumer allows to process multiple messages at a time. This can be useful
 // for batch updates or use cases with high throughput.
 type multiMessageConsumer struct {
-	handler      MultiMessageHandler
+	handler      multiMessageHandler
 	bufferConfig MultiMessageBufferConfiguration
 }
 

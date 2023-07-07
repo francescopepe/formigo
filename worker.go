@@ -105,10 +105,10 @@ func (w worker) runConsumer(errorCh chan<- error, messageCh <-chan messages.Mess
 	return deleteCh
 }
 
-func NewWorker(config WorkerConfiguration) worker {
+func NewWorker(config Configuration) worker {
 	config = setWorkerConfigValues(config)
 
-	return Worker{
+	return worker{
 		client:        config.Client,
 		concurrency:   config.Concurrency,
 		retrievers:    config.Retrievers,
