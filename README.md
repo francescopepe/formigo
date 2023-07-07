@@ -53,8 +53,8 @@ func main() {
         },
         Consumer: worker.NewMultiMessageConsumer(worker.MultiMessageConsumerConfiguration{
             BufferConfig: worker.MultiMessageBufferConfiguration{
-            Size:    500,
-			Timeout: time.Second * 1,
+                Size:    500,
+                Timeout: time.Second * 1,
             },
             Handler: func(ctx context.Context, msgs []interface{}) error {
                 // Your logic here...
