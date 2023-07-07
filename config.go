@@ -107,7 +107,7 @@ func setWorkerConfigValues(config WorkerConfiguration) WorkerConfiguration {
 
 	if config.ErrorConfig.ReportFunc == nil {
 		config.ErrorConfig.ReportFunc = func(err error) {
-			og.Println("ERROR", err)
+			log.Println("ERROR", err)
 		}
 	}
 
