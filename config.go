@@ -10,7 +10,7 @@ import (
 const (
 	defaultErrorThreshold       = 3
 	defaultErrorPeriod          = time.Second * 120
-	defaultConcurrency          = 1
+	defaultConcurrency          = 100
 	defaultRetrievers           = 1
 	defaultDeleterBufferSize    = 10
 	defaultDeleterBufferTimeout = time.Millisecond * 500
@@ -68,7 +68,7 @@ type Configuration struct {
 	// Number of Go routines that process the messages from the Queue.
 	// The higher this value, the more Go routines are spawned to process the messages.
 	// Using a high value can be useful when the Handler of the consumer perform slow I/O operations.
-	// Default: 1.
+	// Default: 100.
 	Concurrency int
 
 	// Number of Go routines that retrieve messages from the Queue.
@@ -76,6 +76,7 @@ type Configuration struct {
 	// queue and provide them to the worker's consumers.
 	// Using a high value can be useful when the network is slow or when consumers are quicker
 	// than retrievers.
+	// Default: 1.
 	Retrievers int
 
 	// The ErrorConfiguration.
