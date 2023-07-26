@@ -18,9 +18,9 @@ Go queue worker is a powerful and flexible Golang library designed to simplify t
 
 ## Installation
 
-Make sure you have Go installed (download)[https://go.dev/dl/]
+Make sure you have Go installed [download](https://go.dev/dl/)
 
-Initialize your project by creating a folder and then running `go mod init github.com/your/repo` inside the folder. Then install the library with the (`go get`)[https://pkg.go.dev/cmd/go/#hdr-Add_dependencies_to_current_module_and_install_them] command:
+Initialize your project by creating a folder and then running `go mod init github.com/your/repo` inside the folder. Then install the library with the [`go get`](https://pkg.go.dev/cmd/go/#hdr-Add_dependencies_to_current_module_and_install_them) command:
 
 ```bash
 go get -u github.com/francescopepe/go-queue-worker
