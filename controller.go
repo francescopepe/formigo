@@ -7,19 +7,17 @@ import (
 	"time"
 )
 
-type controller interface {
-	run(stopFunc context.CancelCauseFunc, errorCh <-chan error)
-}
-
-type defaultController struct {
+type controller struct {
 	errorConfig  ErrorConfiguration
 	errorCounter int
 	mutex        sync.Mutex
+	stopOnce     sync.Once
+	stopFunc     context.CancelCauseFunc
 }
 
 // Decrease counter after the timeout period specified in the errorConfig of
 // the controller.
-func (c *defaultController) decreaseCounterAfterTimeout() {
+func (c *controller) decreaseCounterAfterTimeout() {
 	time.Sleep(c.errorConfig.Period)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -28,51 +26,36 @@ func (c *defaultController) decreaseCounterAfterTimeout() {
 
 // Increases the counter and runs a Go routine to decrease the counter after
 // the timeout period specified in the errorConfig of the controller.
-func (c *defaultController) increaseCounter() {
+func (c *controller) increaseCounter() {
 	// Increase counter
 	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	c.errorCounter++
-	c.mutex.Unlock()
-
-	go c.decreaseCounterAfterTimeout()
 }
 
-func (c *defaultController) shouldStop() bool {
+func (c *controller) shouldStop() bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	return c.errorCounter > c.errorConfig.Threshold
 }
 
-func (c *defaultController) run(stopFunc context.CancelCauseFunc, errorCh <-chan error) {
-	var once sync.Once
+func (c *controller) reportError(err error) {
+	c.errorConfig.ReportFunc(err)
 
-	for {
-		select {
-		case err, open := <-errorCh:
-			if !open {
-				return // Stop signal received
-			}
+	c.increaseCounter()
+	go c.decreaseCounterAfterTimeout()
 
-			c.errorConfig.ReportFunc(err)
-			c.increaseCounter()
-
-			if c.shouldStop() {
-				once.Do(func() {
-					stopFunc(errors.New("too many errors within the given period"))
-				})
-			}
-		}
+	if c.shouldStop() {
+		c.stopOnce.Do(func() {
+			c.stopFunc(errors.New("too many errors within the given period"))
+		})
 	}
 }
 
-func newDefaultController(errorConfig ErrorConfiguration) *defaultController {
-	return &defaultController{
+func newController(errorConfig ErrorConfiguration, stopFunc context.CancelCauseFunc) *controller {
+	return &controller{
 		errorConfig: errorConfig,
+		stopFunc:    stopFunc,
 	}
 }
-
-// Interface guards
-var (
-	_ controller = (*defaultController)(nil)
-)

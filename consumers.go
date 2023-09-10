@@ -22,7 +22,7 @@ type multiMessageHandler = func(ctx context.Context, msgs []interface{}) error
 var errBufferCtxExpired = errors.New("buffer context expired, buffer will Reset")
 
 type consumer interface {
-	consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
+	consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
 }
 
 func makeAvailableConsumers(concurrency int) chan struct{} {
@@ -57,7 +57,7 @@ type singleMessageConsumer struct {
 	handler singleMessageHandler
 }
 
-func (c *singleMessageConsumer) processMessage(errorCh chan<- error, msg messages.Message) error {
+func (c *singleMessageConsumer) processMessage(msg messages.Message) error {
 	defer msg.CancelCtx() // This must be called to release resources associated with the context.
 
 	// Process Message
@@ -68,7 +68,7 @@ func (c *singleMessageConsumer) processMessage(errorCh chan<- error, msg message
 
 // Consumes and deletes a single message, it stops only when the `messageCh` gets closed
 // and doesn't have any messages in it.
-func (c *singleMessageConsumer) consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+func (c *singleMessageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
 	consumers := makeAvailableConsumers(concurrency)
 
 	var wg sync.WaitGroup
@@ -82,9 +82,9 @@ func (c *singleMessageConsumer) consume(concurrency int, errorCh chan<- error, m
 				consumers <- struct{}{} // Release consumer
 			}()
 
-			err := c.processMessage(errorCh, message)
+			err := c.processMessage(message)
 			if err != nil {
-				errorCh <- fmt.Errorf("failed to process message: %w", err)
+				ctrl.reportError(fmt.Errorf("failed to process message: %w", err))
 				return
 			}
 
@@ -110,7 +110,7 @@ type multiMessageConsumer struct {
 }
 
 // It processes the messages and push them downstream for deletion.
-func (c *multiMessageConsumer) processMessages(errorCh chan<- error, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
+func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
 	msgs := make([]interface{}, 0, len(messages))
 	for _, msg := range messages {
 		msgs = append(msgs, msg.Msg)
@@ -119,7 +119,7 @@ func (c *multiMessageConsumer) processMessages(errorCh chan<- error, deleteCh ch
 		return c.handler(ctx, msgs)
 	})
 	if err != nil {
-		errorCh <- fmt.Errorf("failed to process messages: %w", err)
+		ctrl.reportError(fmt.Errorf("failed to process messages: %w", err))
 		return
 	}
 
@@ -132,7 +132,7 @@ func (c *multiMessageConsumer) processMessages(errorCh chan<- error, deleteCh ch
 // Consumes and deletes a number of messages in the interval [1, N] based on configuration
 // provided in the BufferConfiguration.
 // It stops only when the messageCh gets closed and doesn't have any messages in it.
-func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+func (c *multiMessageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
 	consumers := makeAvailableConsumers(concurrency)
 
 	// Create buffer
@@ -166,7 +166,7 @@ func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, me
 				}
 
 			case <-buffer.CtxExpired():
-				errorCh <- errBufferCtxExpired
+				ctrl.reportError(errBufferCtxExpired)
 
 				// Reset the buffer.
 				buffer.Reset()
@@ -179,7 +179,7 @@ func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, me
 			select {
 			case <-consumers: // Use an available consumer
 			case <-buffer.CtxExpired():
-				errorCh <- errBufferCtxExpired
+				ctrl.reportError(errBufferCtxExpired)
 
 				// Reset the buffer.
 				buffer.Reset()
@@ -197,7 +197,7 @@ func (c *multiMessageConsumer) consume(concurrency int, errorCh chan<- error, me
 				}()
 
 				// Process the messages
-				c.processMessages(errorCh, deleteCh, ctx, msgs)
+				c.processMessages(ctrl, deleteCh, ctx, msgs)
 			}(ctx, cancelCtx, buffer.Messages())
 
 			// Reset buffer
