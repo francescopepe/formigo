@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	awsSqs "github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -22,8 +23,9 @@ type SqsClientConfiguration struct {
 	// Defines the interval within which the message must be processed.
 	// If empty, it tries to set the value from the ReceiveMessageInput's
 	// VisibilityTimeout.
-	// If not defined, the messages' context will never expire.
-	// It's highly recommended to set this value.
+	// If ReceiveMessageInput's VisibilityTimeout is empty it retrieves the
+	// default value set on the queue. This action will fail if the client
+	// does not have the permission to retrieve the SQS queue's attributes.
 	MessageCtxTimeout time.Duration
 }
 
@@ -69,31 +71,44 @@ func (c sqsClient) createMessage(sqsMessage types.Message) messages.Message {
 		Msg: sqsMessage,
 	}
 
-	timeout := c.messageCtxTimeout
-	if timeout == 0 {
-		// Try to infer from ReceiveMessage's VisibilityTimeout
-		timeout = time.Second * time.Duration(c.receiveMessageInput.VisibilityTimeout)
-	}
-
-	if timeout == 0 {
-		// Set a context that never expires
-		msg.Ctx, msg.CancelCtx = context.Background(), func() {}
-
-		return msg
-	}
-
 	// Set a context with timeout
-	msg.Ctx, msg.CancelCtx = context.WithTimeout(context.Background(), timeout)
+	msg.Ctx, msg.CancelCtx = context.WithTimeout(context.Background(), c.messageCtxTimeout)
 
 	return msg
 }
 
-func NewSqsClient(config SqsClientConfiguration) sqsClient {
+func NewSqsClient(ctx context.Context, config SqsClientConfiguration) (sqsClient, error) {
+	messageTimeout := config.MessageCtxTimeout
+	if messageTimeout == 0 {
+		var err error
+		messageTimeout, err = retrieveVisibilityTimeout(ctx, config.Svc, config.ReceiveMessageInput.QueueUrl)
+		if err != nil {
+			return sqsClient{}, fmt.Errorf("unable to retrieve visibility timeout: %w", err)
+		}
+	}
+
 	return sqsClient{
 		svc:                 config.Svc,
 		receiveMessageInput: config.ReceiveMessageInput,
-		messageCtxTimeout:   config.MessageCtxTimeout,
+		messageCtxTimeout:   messageTimeout,
+	}, nil
+}
+
+func retrieveVisibilityTimeout(ctx context.Context, svc *awsSqs.Client, queue *string) (time.Duration, error) {
+	out, err := svc.GetQueueAttributes(ctx, &awsSqs.GetQueueAttributesInput{
+		QueueUrl:       queue,
+		AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameVisibilityTimeout},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("unable to get attributes: %w", err)
 	}
+
+	timeout, err := strconv.Atoi(out.Attributes[string(types.QueueAttributeNameVisibilityTimeout)])
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse timeout: %w", err)
+	}
+
+	return time.Second * time.Duration(timeout), nil
 }
 
 // Interface guards
