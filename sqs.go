@@ -1,4 +1,4 @@
-package clients
+package worker
 
 import (
 	"context"
@@ -87,7 +87,7 @@ func NewSqsClient(ctx context.Context, config SqsClientConfiguration) (sqsClient
 	// Otherwise, infer it from SQS queue's VisibilityTimeout attribute
 	if messageTimeout == 0 {
 		var err error
-		messageTimeout, err = retrieveVisibilityTimeout(ctx, config.Svc, config.ReceiveMessageInput.QueueUrl)
+		messageTimeout, err = retrieveSqsQueueVisibilityTimeout(ctx, config.Svc, config.ReceiveMessageInput.QueueUrl)
 		if err != nil {
 			return sqsClient{}, fmt.Errorf("unable to retrieve visibility timeout: %w", err)
 		}
@@ -100,7 +100,7 @@ func NewSqsClient(ctx context.Context, config SqsClientConfiguration) (sqsClient
 	}, nil
 }
 
-func retrieveVisibilityTimeout(ctx context.Context, svc *awsSqs.Client, queue *string) (time.Duration, error) {
+func retrieveSqsQueueVisibilityTimeout(ctx context.Context, svc *awsSqs.Client, queue *string) (time.Duration, error) {
 	out, err := svc.GetQueueAttributes(ctx, &awsSqs.GetQueueAttributesInput{
 		QueueUrl:       queue,
 		AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameVisibilityTimeout},

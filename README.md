@@ -39,7 +39,6 @@ import (
     "log"
 
     "github.com/francescopepe/go-queue-worker"
-    workerSqs "github.com/francescopepe/go-queue-worker/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -56,7 +55,7 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
-    sqsClient, err := workerSqs.NewSqsClient(ctx, workerSqs.SqsClientConfiguration{
+    sqsClient, err := worker.NewSqsClient(ctx, worker.SqsClientConfiguration{
         Svc: sqsSvc,
         ReceiveMessageInput: &sqs.ReceiveMessageInput{
             QueueUrl:            &queueUrl,
@@ -109,7 +108,6 @@ import (
     "log"
 
     "github.com/francescopepe/go-queue-worker"
-    workerSqs "github.com/francescopepe/go-queue-worker/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -126,7 +124,7 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
-    sqsClient, err := workerSqs.NewSqsClient(ctx, workerSqs.SqsClientConfiguration{
+    sqsClient, err := worker.NewSqsClient(ctx, worker.SqsClientConfiguration{
         Svc: sqsSvc,
         ReceiveMessageInput: &sqs.ReceiveMessageInput{
             QueueUrl:            &queueUrl,
