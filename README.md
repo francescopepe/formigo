@@ -56,17 +56,21 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
+    sqsClient, err := workerSqs.NewSqsClient(ctx, workerSqs.SqsClientConfiguration{
+        Svc: sqsSvc,
+        ReceiveMessageInput: &sqs.ReceiveMessageInput{
+            QueueUrl:            &queueUrl,
+            MaxNumberOfMessages: 1,
+            VisibilityTimeout:   30,
+            WaitTimeSeconds:     20,
+        },
+    })
+    if err != nil {
+        return fmt.Errorf("unable to create sqs client: %w", err)
+    }
 
     wkr := worker.NewWorker(worker.Configuration{
-        Client: workerSqs.NewSqsClient(workerSqs.SqsClientConfiguration{
-            Svc: sqsSvc,
-            ReceiveMessageInput: &sqs.ReceiveMessageInput{
-                QueueUrl:            aws.String(os.Getenv("SQS_QUEUE_URL")),
-                MaxNumberOfMessages: 10,
-                VisibilityTimeout:   30,
-                WaitTimeSeconds:     20,
-            },
-        }),
+        Client: sqsClient,
         Concurrency: 100,
         Consumer: worker.NewSingleMessageConsumer(worker.SingleMessageConsumerConfiguration{
             Handler: func(ctx context.Context, msg interface{}) error {
@@ -122,17 +126,21 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
+    sqsClient, err := workerSqs.NewSqsClient(ctx, workerSqs.SqsClientConfiguration{
+        Svc: sqsSvc,
+        ReceiveMessageInput: &sqs.ReceiveMessageInput{
+            QueueUrl:            &queueUrl,
+            MaxNumberOfMessages: 1,
+            VisibilityTimeout:   30,
+            WaitTimeSeconds:     20,
+        },
+    })
+    if err != nil {
+        return fmt.Errorf("unable to create sqs client: %w", err)
+    }
 
     wkr := worker.NewWorker(worker.Configuration{
-        Client: workerSqs.NewSqsClient(workerSqs.SqsClientConfiguration{
-            Svc: sqsSvc,
-            ReceiveMessageInput: &sqs.ReceiveMessageInput{
-                QueueUrl:            aws.String(os.Getenv("SQS_QUEUE_URL")),
-                MaxNumberOfMessages: 10,
-                VisibilityTimeout:   30,
-                WaitTimeSeconds:     20,
-            },
-        }),
+        Client: sqsClient,
         Concurrency: 100,
         Consumer: worker.NewMultiMessageConsumer(worker.MultiMessageConsumerConfiguration{
             BufferConfig: worker.MultiMessageBufferConfiguration{
