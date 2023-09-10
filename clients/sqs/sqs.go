@@ -79,6 +79,12 @@ func (c sqsClient) createMessage(sqsMessage types.Message) messages.Message {
 
 func NewSqsClient(ctx context.Context, config SqsClientConfiguration) (sqsClient, error) {
 	messageTimeout := config.MessageCtxTimeout
+
+	// Try config.ReceiveMessageInput.VisibilityTimeout first
+	if messageTimeout == 0 && config.ReceiveMessageInput.VisibilityTimeout != 0 {
+		messageTimeout = time.Second * time.Duration(config.ReceiveMessageInput.VisibilityTimeout)
+	}
+	// Otherwise, infer it from SQS queue's VisibilityTimeout attribute
 	if messageTimeout == 0 {
 		var err error
 		messageTimeout, err = retrieveVisibilityTimeout(ctx, config.Svc, config.ReceiveMessageInput.QueueUrl)
@@ -105,7 +111,7 @@ func retrieveVisibilityTimeout(ctx context.Context, svc *awsSqs.Client, queue *s
 
 	timeout, err := strconv.Atoi(out.Attributes[string(types.QueueAttributeNameVisibilityTimeout)])
 	if err != nil {
-		return 0, fmt.Errorf("unable to parse timeout: %w", err)
+		return 0, fmt.Errorf("unable to parse timeout value: %w", err)
 	}
 
 	return time.Second * time.Duration(timeout), nil
