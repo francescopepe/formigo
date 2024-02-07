@@ -48,20 +48,34 @@ func (c sqsClient) ReceiveMessages() ([]messages.Message, error) {
 }
 
 func (c sqsClient) DeleteMessages(messages []messages.Message) error {
-	deleteEntries := make([]types.DeleteMessageBatchRequestEntry, 0, len(messages))
-	for _, message := range messages {
-		deleteEntries = append(deleteEntries, types.DeleteMessageBatchRequestEntry{
-			Id:            message.Msg.(types.Message).MessageId,
-			ReceiptHandle: message.Msg.(types.Message).ReceiptHandle,
-		})
-	}
-
 	_, err := c.svc.DeleteMessageBatch(context.Background(), &awsSqs.DeleteMessageBatchInput{
-		Entries:  deleteEntries,
+		Entries:  c.prepareMessagesForDeletion(messages),
 		QueueUrl: c.receiveMessageInput.QueueUrl,
 	})
 
 	return err
+}
+
+// prepareMessagesForDeletion takes the processed message batch to transform into a de-duplicated struct for SQS to handle
+func (c sqsClient) prepareMessagesForDeletion(messages []messages.Message) []types.DeleteMessageBatchRequestEntry {
+	deleteEntries := make([]types.DeleteMessageBatchRequestEntry, 0, len(messages))
+	processed := map[string]bool{}
+
+	for _, message := range messages {
+		msgId := message.Msg.(types.Message).MessageId
+		if _, exists := processed[*msgId]; exists {
+			continue
+		}
+
+		deleteEntries = append(deleteEntries, types.DeleteMessageBatchRequestEntry{
+			Id:            msgId,
+			ReceiptHandle: message.Msg.(types.Message).ReceiptHandle,
+		})
+
+		processed[*msgId] = true
+	}
+
+	return deleteEntries
 }
 
 func (c sqsClient) createMessage(sqsMessage types.Message) messages.Message {
