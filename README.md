@@ -23,7 +23,7 @@ Make sure you have Go installed [download](https://go.dev/dl/)
 Initialize your project by creating a folder and then running `go mod init github.com/your/repo` inside the folder. Then install the library with the [`go get`](https://pkg.go.dev/cmd/go/#hdr-Add_dependencies_to_current_module_and_install_them) command:
 
 ```bash
-go get -u github.com/francescopepe/go-queue-worker
+go get -u github.com/francescopepe/formigo
 ```
 
 ## Examples
@@ -38,8 +38,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/francescopepe/go-queue-worker"
-    workerSqs "github.com/francescopepe/go-queue-worker/clients/sqs"
+    "github.com/francescopepe/formigo"
+    workerSqs "github.com/francescopepe/formigo/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -104,8 +104,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/francescopepe/go-queue-worker"
-    workerSqs "github.com/francescopepe/go-queue-worker/clients/sqs"
+    "github.com/francescopepe/formigo"
+    workerSqs "github.com/francescopepe/formigo/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"

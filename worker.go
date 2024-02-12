@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/francescopepe/go-queue-worker/internal/client"
-	"github.com/francescopepe/go-queue-worker/internal/messages"
+	"github.com/francescopepe/formigo/internal/client"
+	"github.com/francescopepe/formigo/internal/messages"
 )
 
 type worker struct {
