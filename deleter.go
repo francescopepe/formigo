@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/francescopepe/go-queue-worker/internal/client"
-	"github.com/francescopepe/go-queue-worker/internal/messages"
+	"github.com/francescopepe/formigo/internal/client"
+	"github.com/francescopepe/formigo/internal/messages"
 )
 
 // deleter will delete messages from SQS until the delete channel gets closed.

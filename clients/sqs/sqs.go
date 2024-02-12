@@ -8,8 +8,8 @@ import (
 	awsSqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
-	"github.com/francescopepe/go-queue-worker/internal/client"
-	"github.com/francescopepe/go-queue-worker/internal/messages"
+	"github.com/francescopepe/formigo/internal/client"
+	"github.com/francescopepe/formigo/internal/messages"
 )
 
 type SqsClientConfiguration struct {
