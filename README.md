@@ -1,6 +1,6 @@
-# Go queue worker - A Golang Library for Efficient Queue Processing.
+# Formigo - A Golang Library for Efficient Queue Processing.
 
-Go queue worker is a powerful and flexible Golang library designed to simplify the processing of messages from queues. It currently supports AWS SQS, with the capability to extend its functionality to accommodate multiple types of queues. With this library, you can effortlessly manage and scale the concurrent processing of messages, ensuring efficient utilization of resources and increased throughput.
+Formigo is a powerful and flexible Golang library designed to simplify the processing of messages from queues. It currently supports AWS SQS, with the capability to extend its functionality to accommodate multiple types of queues. With this library, you can effortlessly manage and scale the concurrent processing of messages, ensuring efficient utilization of resources and increased throughput.
 
 ## Key Features
 
