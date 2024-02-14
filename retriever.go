@@ -1,8 +1,9 @@
-package worker
+package formigo
 
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/francescopepe/formigo/internal/client"
 	"github.com/francescopepe/formigo/internal/messages"
@@ -10,7 +11,7 @@ import (
 
 // retriever will get messages from SQS until the given context gets canceled.
 // Any error will be sent to the controller.
-func retriever(ctx context.Context, receiver client.MessageReceiver, errorCh chan<- error, messageCh chan<- messages.Message) {
+func retriever(ctx context.Context, receiver client.MessageReceiver, ctrl *controller, messageCh chan<- messages.Message) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -18,7 +19,7 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, errorCh cha
 		default:
 			messages, err := receiver.ReceiveMessages()
 			if err != nil {
-				errorCh <- err
+				ctrl.reportError(fmt.Errorf("unable to receive message: %w", err))
 				continue
 			}
 
@@ -38,7 +39,7 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, errorCh cha
 						//
 						// Note that we won't process all messages retrieved by the API calls. This is because
 						// the visibility timeout is the same for all the messages returned by the call.
-						errorCh <- errors.New("message didn't get picked up by any consumer within its timeout")
+						ctrl.reportError(errors.New("message didn't get picked up by any consumer within its timeout"))
 
 						return // Avoid publishing all the messages downstream
 					case messageCh <- message:

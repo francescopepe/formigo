@@ -1,4 +1,4 @@
-package worker
+package formigo
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 // deleter will delete messages from SQS until the delete channel gets closed.
 // Any error will be sent to the error channel.
-func deleter(wg *sync.WaitGroup, deleter client.MessageDeleter, config DeleterConfiguration, errorCh chan<- error, deleteCh <-chan messages.Message) {
+func deleter(wg *sync.WaitGroup, deleter client.MessageDeleter, config DeleterConfiguration, ctrl *controller, deleteCh <-chan messages.Message) {
 	// Create buffer
 	buffer := messages.NewMessageBuffer(messages.BufferConfiguration{
 		Size:    config.BufferSize,
@@ -53,7 +53,7 @@ func deleter(wg *sync.WaitGroup, deleter client.MessageDeleter, config DeleterCo
 			// we want to do our best to delete it from the queue.
 			err := deleter.DeleteMessages(msgs)
 			if err != nil {
-				errorCh <- fmt.Errorf("unable to delete %d messages: %w", len(msgs), err)
+				ctrl.reportError(fmt.Errorf("unable to delete %d messages: %w", len(msgs), err))
 			}
 		}(msgs)
 

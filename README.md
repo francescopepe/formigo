@@ -39,7 +39,6 @@ import (
     "log"
 
     "github.com/francescopepe/formigo"
-    workerSqs "github.com/francescopepe/formigo/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -56,19 +55,23 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
+    sqsClient, err := formigo.NewSqsClient(ctx, formigo.SqsClientConfiguration{
+        Svc: sqsSvc,
+        ReceiveMessageInput: &sqs.ReceiveMessageInput{
+            QueueUrl:            &queueUrl,
+            MaxNumberOfMessages: 1,
+            VisibilityTimeout:   30,
+            WaitTimeSeconds:     20,
+        },
+    })
+    if err != nil {
+        return fmt.Errorf("unable to create sqs client: %w", err)
+    }
 
-    wkr := worker.NewWorker(worker.Configuration{
-        Client: workerSqs.NewSqsClient(workerSqs.SqsClientConfiguration{
-            Svc: sqsSvc,
-            ReceiveMessageInput: &sqs.ReceiveMessageInput{
-                QueueUrl:            aws.String(os.Getenv("SQS_QUEUE_URL")),
-                MaxNumberOfMessages: 10,
-                VisibilityTimeout:   30,
-                WaitTimeSeconds:     20,
-            },
-        }),
+    wkr := formigo.NewWorker(formigo.Configuration{
+        Client: sqsClient,
         Concurrency: 100,
-        Consumer: worker.NewSingleMessageConsumer(worker.SingleMessageConsumerConfiguration{
+        Consumer: formigo.NewSingleMessageConsumer(formigo.SingleMessageConsumerConfiguration{
             Handler: func(ctx context.Context, msg interface{}) error {
                 log.Println("Got Message", msgs)
 
@@ -105,7 +108,6 @@ import (
     "log"
 
     "github.com/francescopepe/formigo"
-    workerSqs "github.com/francescopepe/formigo/clients/sqs"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -122,20 +124,24 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
+    sqsClient, err := formigo.NewSqsClient(ctx, formigo.SqsClientConfiguration{
+        Svc: sqsSvc,
+        ReceiveMessageInput: &sqs.ReceiveMessageInput{
+            QueueUrl:            &queueUrl,
+            MaxNumberOfMessages: 1,
+            VisibilityTimeout:   30,
+            WaitTimeSeconds:     20,
+        },
+    })
+    if err != nil {
+        return fmt.Errorf("unable to create sqs client: %w", err)
+    }
 
-    wkr := worker.NewWorker(worker.Configuration{
-        Client: workerSqs.NewSqsClient(workerSqs.SqsClientConfiguration{
-            Svc: sqsSvc,
-            ReceiveMessageInput: &sqs.ReceiveMessageInput{
-                QueueUrl:            aws.String(os.Getenv("SQS_QUEUE_URL")),
-                MaxNumberOfMessages: 10,
-                VisibilityTimeout:   30,
-                WaitTimeSeconds:     20,
-            },
-        }),
+    wkr := formigo.NewWorker(formigo.Configuration{
+        Client: sqsClient,
         Concurrency: 100,
-        Consumer: worker.NewMultiMessageConsumer(worker.MultiMessageConsumerConfiguration{
-            BufferConfig: worker.MultiMessageBufferConfiguration{
+        Consumer: formigo.NewMultiMessageConsumer(formigo.MultiMessageConsumerConfiguration{
+            BufferConfig: formigo.MultiMessageBufferConfiguration{
                 Size:    100,
                 Timeout: time.Second * 5,
             },
