@@ -1,4 +1,4 @@
-module github.com/francescopepe/go-queue-worker
+module github.com/francescopepe/formigo
 
 go 1.20
 

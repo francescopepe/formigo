@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/francescopepe/go-queue-worker/internal/client"
-	"github.com/francescopepe/go-queue-worker/internal/messages"
+	"github.com/francescopepe/formigo/internal/client"
+	"github.com/francescopepe/formigo/internal/messages"
 )
 
 // retriever will get messages from SQS until the given context gets canceled.

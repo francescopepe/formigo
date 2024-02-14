@@ -1,6 +1,6 @@
-# Go queue worker - A Golang Library for Efficient Queue Processing.
+# Formigo - A Golang Library for Efficient Queue Processing.
 
-Go queue worker is a powerful and flexible Golang library designed to simplify the processing of messages from queues. It currently supports AWS SQS, with the capability to extend its functionality to accommodate multiple types of queues. With this library, you can effortlessly manage and scale the concurrent processing of messages, ensuring efficient utilization of resources and increased throughput.
+Formigo is a powerful and flexible Golang library designed to simplify the processing of messages from queues. It currently supports AWS SQS, with the capability to extend its functionality to accommodate multiple types of queues. With this library, you can effortlessly manage and scale the concurrent processing of messages, ensuring efficient utilization of resources and increased throughput.
 
 ## Key Features
 
@@ -18,12 +18,12 @@ Go queue worker is a powerful and flexible Golang library designed to simplify t
 
 ## Installation
 
-Make sure you have Go installed (download)[https://go.dev/dl/]
+Make sure you have Go installed [download](https://go.dev/dl/)
 
-Initialize your project by creating a folder and then running `go mod init github.com/your/repo` inside the folder. Then install the library with the (`go get`)[https://pkg.go.dev/cmd/go/#hdr-Add_dependencies_to_current_module_and_install_them] command:
+Initialize your project by creating a folder and then running `go mod init github.com/your/repo` inside the folder. Then install the library with the [`go get`](https://pkg.go.dev/cmd/go/#hdr-Add_dependencies_to_current_module_and_install_them) command:
 
 ```bash
-go get -u github.com/francescopepe/go-queue-worker
+go get -u github.com/francescopepe/formigo
 ```
 
 ## Examples
@@ -38,7 +38,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/francescopepe/go-queue-worker"
+    "github.com/francescopepe/formigo"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -55,7 +55,7 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
-    sqsClient, err := worker.NewSqsClient(ctx, worker.SqsClientConfiguration{
+    sqsClient, err := formigo.NewSqsClient(ctx, formigo.SqsClientConfiguration{
         Svc: sqsSvc,
         ReceiveMessageInput: &sqs.ReceiveMessageInput{
             QueueUrl:            &queueUrl,
@@ -68,10 +68,10 @@ func main() {
         return fmt.Errorf("unable to create sqs client: %w", err)
     }
 
-    wkr := worker.NewWorker(worker.Configuration{
+    wkr := formigo.NewWorker(formigo.Configuration{
         Client: sqsClient,
         Concurrency: 100,
-        Consumer: worker.NewSingleMessageConsumer(worker.SingleMessageConsumerConfiguration{
+        Consumer: formigo.NewSingleMessageConsumer(formigo.SingleMessageConsumerConfiguration{
             Handler: func(ctx context.Context, msg interface{}) error {
                 log.Println("Got Message", msgs)
 
@@ -107,7 +107,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/francescopepe/go-queue-worker"
+    "github.com/francescopepe/formigo"
 
     "github.com/aws/aws-sdk-go-v2/aws"
     "github.com/aws/aws-sdk-go-v2/config"
@@ -124,7 +124,7 @@ func main() {
     }
 
     sqsSvc := sqs.NewFromConfig(awsCfg)
-    sqsClient, err := worker.NewSqsClient(ctx, worker.SqsClientConfiguration{
+    sqsClient, err := formigo.NewSqsClient(ctx, formigo.SqsClientConfiguration{
         Svc: sqsSvc,
         ReceiveMessageInput: &sqs.ReceiveMessageInput{
             QueueUrl:            &queueUrl,
@@ -137,11 +137,11 @@ func main() {
         return fmt.Errorf("unable to create sqs client: %w", err)
     }
 
-    wkr := worker.NewWorker(worker.Configuration{
+    wkr := formigo.NewWorker(formigo.Configuration{
         Client: sqsClient,
         Concurrency: 100,
-        Consumer: worker.NewMultiMessageConsumer(worker.MultiMessageConsumerConfiguration{
-            BufferConfig: worker.MultiMessageBufferConfiguration{
+        Consumer: formigo.NewMultiMessageConsumer(formigo.MultiMessageConsumerConfiguration{
+            BufferConfig: formigo.MultiMessageBufferConfiguration{
                 Size:    100,
                 Timeout: time.Second * 5,
             },
