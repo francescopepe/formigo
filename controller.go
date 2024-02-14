@@ -24,8 +24,7 @@ func (c *controller) decreaseCounterAfterTimeout() {
 	c.errorCounter--
 }
 
-// Increases the counter and runs a Go routine to decrease the counter after
-// the timeout period specified in the errorConfig of the controller.
+// Increases the counter
 func (c *controller) increaseCounter() {
 	// Increase counter
 	c.mutex.Lock()
