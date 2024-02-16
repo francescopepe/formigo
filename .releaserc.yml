@@ -1,16 +1,14 @@
 ---
-branch: main
+branches:
+  - main
 preset: "angular"
 tagFormat: "v${version}"
 plugins:
   - "@semantic-release/commit-analyzer"
   - "@semantic-release/release-notes-generator"
-  - "@semantic-release/changelog"
-  - "@semantic-release/git"
   - "@semantic-release/github"
 
 verifyConditions:
-  - '@semantic-release/git'
   - "@semantic-release/github"
 analyzeCommits:
   - path: "@semantic-release/commit-analyzer"
@@ -58,10 +56,6 @@ generateNotes:
     - type: "test"
     - hidden: true
     presetConfig: true
-prepare:
-  - path: "@semantic-release/git"
-  - path: "@semantic-release/changelog"
-    changelogFile: "docs/CHANGELOG.md"
 publish:
   - path: "@semantic-release/github"
 
