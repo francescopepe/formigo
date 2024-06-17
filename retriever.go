@@ -17,7 +17,7 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, ctrl *contr
 		case <-ctx.Done():
 			return
 		default:
-			messages, err := receiver.ReceiveMessages()
+			msgs, err := receiver.ReceiveMessages()
 			if err != nil {
 				ctrl.reportError(fmt.Errorf("unable to receive message: %w", err))
 				continue
@@ -27,9 +27,9 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, ctrl *contr
 			// This means that the retriever won't listen for context cancellation
 			// at this stage.
 			func() {
-				for _, message := range messages {
+				for _, msg := range msgs {
 					select {
-					case <-message.Ctx.Done():
+					case <-msg.Ctx.Done():
 						// If consumers don't pick up the messages within the messages' timeout we raise
 						// an error.
 						// This could be due to one or more of the following reasons:
@@ -42,7 +42,7 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, ctrl *contr
 						ctrl.reportError(errors.New("message didn't get picked up by any consumer within its timeout"))
 
 						return // Avoid publishing all the messages downstream
-					case messageCh <- message:
+					case messageCh <- msg:
 						// Message pushed to the channel
 					}
 				}

@@ -33,8 +33,8 @@ type ErrorConfiguration struct {
 	// Default: 120s.
 	Period time.Duration
 
-	// The error report function
-	ReportFunc func(err error)
+	// The error report function, returns a boolean value to decide whether the error counts towards to threshold
+	ReportFunc func(err error) bool
 }
 
 // The MultiMessageBufferConfiguration defines a buffer which is consumed by the worker when either
@@ -107,8 +107,10 @@ func setWorkerConfigValues(config Configuration) Configuration {
 	}
 
 	if config.ErrorConfig.ReportFunc == nil {
-		config.ErrorConfig.ReportFunc = func(err error) {
+		config.ErrorConfig.ReportFunc = func(err error) bool {
 			log.Println("ERROR", err)
+
+			return true
 		}
 	}
 

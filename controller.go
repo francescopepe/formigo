@@ -19,8 +19,10 @@ type controller struct {
 // the controller.
 func (c *controller) decreaseCounterAfterTimeout() {
 	time.Sleep(c.errorConfig.Period)
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
 	c.errorCounter--
 }
 
@@ -29,6 +31,7 @@ func (c *controller) increaseCounter() {
 	// Increase counter
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
 	c.errorCounter++
 }
 
@@ -40,7 +43,9 @@ func (c *controller) shouldStop() bool {
 }
 
 func (c *controller) reportError(err error) {
-	c.errorConfig.ReportFunc(err)
+	if shouldIncreaseCounter := c.errorConfig.ReportFunc(err); !shouldIncreaseCounter {
+		return
+	}
 
 	c.increaseCounter()
 	go c.decreaseCounterAfterTimeout()

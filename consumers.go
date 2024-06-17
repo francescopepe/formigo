@@ -34,7 +34,7 @@ func makeAvailableConsumers(concurrency int) chan struct{} {
 	return consumers
 }
 
-// wrapHandler catches any panic error, logs it and returns the error that generated it.
+// wrapHandler catches any panic error and returns the error that generated it.
 // It prevents the worker from crashing in case of an unexpected error.
 func wrapHandler(handler func() error) (err error) {
 	defer func() {
