@@ -106,7 +106,7 @@ type BufferWithContextTimeoutConfiguration struct {
 	Size          int
 }
 
-// bufferWithContextTimeout is used to construct a buffer that has a context timeout
+// BufferWithContextTimeout is used to construct a buffer that has a context timeout
 // along with the standard buffer timeout. This is used because the messages have to
 // be processed within a certain period and if this doesn't happen, the buffer should
 // delete the messages in it and reset.
