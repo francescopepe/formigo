@@ -82,6 +82,7 @@ func (c sqsClient) prepareMessagesForDeletion(messages []messages.Message) []typ
 
 func (c sqsClient) createMessage(sqsMessage types.Message) messages.Message {
 	msg := messages.Message{
+		MsgId:        *sqsMessage.MessageId,
 		Msg:          sqsMessage,
 		ReceivedTime: time.Now(),
 	}

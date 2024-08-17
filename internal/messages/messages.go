@@ -9,7 +9,12 @@ type Message struct {
 	Ctx          context.Context
 	CancelCtx    context.CancelFunc
 	Msg          interface{}
+	MsgId        interface{}
 	ReceivedTime time.Time
+}
+
+func (m Message) Id() interface{} {
+	return m.MsgId
 }
 
 func (m Message) Content() interface{} {
@@ -145,7 +150,7 @@ func (b *BufferWithContextTimeout) Add(msg Message) {
 
 // Reset resets its internal buffer, cancel the current context created and
 // reset any timeout.
-// It's important to call this function avoid memory leaks. In fact, the
+// It's important to call this function to avoid memory leaks. In fact, the
 // GC won't collect any timer or resources allocated within the context.
 // NOTE: this function should be always called to clean up any buffer
 // created. Used in defer can guarantee that it always run.

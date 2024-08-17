@@ -6,7 +6,7 @@ Formigo is a powerful and flexible Golang library designed to simplify the proce
 
 - **Efficient Throughput Management**: it offers optimal throughput management, allowing you to fine-tune the number of Go routines responsible for both polling messages from the queue and processing them. This dynamic control ensures maximum efficiency in various scenarios, making the library highly adaptable to your application's needs.
 
-- **Configurable Batch Processing**: it uses powerful batch processing capabilities, enabling you to handle messages efficiently in customizable batches. With the Multiple Message Handler, messages can be processed in batches of a size you define, granting you full control over the processing logic. Moreover, you can adjust the batch buffer size and timeout settings, providing a flexible and optimal solution to process messages under various workloads.
+- **Configurable Batch Processing**: it uses powerful batch processing capabilities, enabling you to handle messages efficiently in customizable batches. With the Batch Handler, messages can be processed in batches of a size you define, granting you full control over the processing logic. Moreover, you can adjust the batch buffer size and timeout settings, providing a flexible and optimal solution to process messages under various workloads.
 
 - **Context Cancellation**: Effortlessly stop the QueueWorker by canceling its context. This feature guarantees smooth and controlled termination of the worker whenever required.
 
@@ -140,8 +140,8 @@ func main() {
     wkr := formigo.NewWorker(formigo.Configuration{
         Client: sqsClient,
         Concurrency: 100,
-        Consumer: formigo.NewMultiMessageConsumer(formigo.MultiMessageConsumerConfiguration{
-            BufferConfig: formigo.MultiMessageBufferConfiguration{
+        Consumer: formigo.BatchConsumer(formigo.BatchConsumerConfiguration{
+            BufferConfig: formigo.BatchBufferConfiguration{
                 Size:    100,
                 Timeout: time.Second * 5,
             },
@@ -180,7 +180,7 @@ By processing messages in batches, the worker can significantly enhance throughp
 | Concurrency   | Number of Go routines that process the messages from the Queue. Higher values are useful for slow I/O operations in the consumer's handler.     | 100           |
 | Retrievers    | Number of Go routines that retrieve messages from the Queue. Higher values are helpful for slow networks or when consumers are quicker.         | 1             |
 | ErrorConfig   | Defines the error threshold and interval for worker termination and error reporting function.                                                   | None          |
-| Consumer      | The message consumer, either MessageConsumer or MultipleMessageConsumer.                                                                        | None          |
+| Consumer      | The message consumer, either MessageConsumer or BatchConsumer.                                                                                  | None          |
 
 ## License
 

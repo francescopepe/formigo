@@ -37,9 +37,9 @@ type ErrorConfiguration struct {
 	ReportFunc func(err error) bool
 }
 
-// The MultiMessageBufferConfiguration defines a buffer which is consumed by the worker when either
+// The BatchConsumerBufferConfiguration defines a buffer which is consumed by the worker when either
 // the buffer is full or the timeout has passed since the first message got added.
-type MultiMessageBufferConfiguration struct {
+type BatchConsumerBufferConfiguration struct {
 	// Max number of messages that the buffer can contain.
 	// Default: 10.
 	Size int
@@ -56,9 +56,9 @@ type MessageConsumerConfiguration struct {
 	Handler messageHandler
 }
 
-type MultiMessageConsumerConfiguration struct {
-	Handler      multiMessageHandler
-	BufferConfig MultiMessageBufferConfiguration
+type BatchConsumerConfiguration struct {
+	Handler      batchHandler
+	BufferConfig BatchConsumerBufferConfiguration
 }
 
 type Configuration struct {
