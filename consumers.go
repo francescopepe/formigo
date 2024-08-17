@@ -12,6 +12,7 @@ import (
 
 type singleMessageHandler = func(ctx context.Context, msg Message) error
 type multiMessageHandler = func(ctx context.Context, msgs []Message) error
+type messageHandler = func(ctx context.Context, msg Message) error
 
 // This means that the buffered messages didn't get passed to the handler within
 // the first message's timeout.
@@ -49,15 +50,15 @@ func wrapHandler(handler func() error) (err error) {
 	return err
 }
 
-// singleMessageConsumer defines a message handler that consumes only one message at a
+// messageConsumer defines a message handler that consumes only one message at a
 // time.
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
-type singleMessageConsumer struct {
-	handler singleMessageHandler
+type messageConsumer struct {
+	handler messageHandler
 }
 
-func (c *singleMessageConsumer) processMessage(msg messages.Message) error {
+func (c *messageConsumer) processMessage(msg messages.Message) error {
 	defer msg.CancelCtx() // This must be called to release resources associated with the context.
 
 	// Process Message
@@ -68,12 +69,12 @@ func (c *singleMessageConsumer) processMessage(msg messages.Message) error {
 
 // Consumes and deletes a single message, it stops only when the `messageCh` gets closed
 // and doesn't have any messages in it.
-func (c *singleMessageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+func (c *messageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
 	consumers := makeAvailableConsumers(concurrency)
 
 	var wg sync.WaitGroup
 	for msg := range messageCh {
-		<-consumers // Use an available comsumer
+		<-consumers // Use an available consumer
 
 		wg.Add(1)
 		go func(message messages.Message) {
@@ -96,8 +97,8 @@ func (c *singleMessageConsumer) consume(concurrency int, ctrl *controller, messa
 	wg.Wait()
 }
 
-func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *singleMessageConsumer {
-	return &singleMessageConsumer{
+func NewMessageConsumer(config MessageConsumerConfiguration) *messageConsumer {
+	return &messageConsumer{
 		handler: config.Handler,
 	}
 }
@@ -229,4 +230,5 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *multiMes
 var (
 	_ consumer = (*singleMessageConsumer)(nil)
 	_ consumer = (*multiMessageConsumer)(nil)
+	_ consumer = (*messageConsumer)(nil)
 )

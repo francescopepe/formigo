@@ -71,7 +71,7 @@ func main() {
     wkr := formigo.NewWorker(formigo.Configuration{
         Client: sqsClient,
         Concurrency: 100,
-        Consumer: formigo.NewSingleMessageConsumer(formigo.SingleMessageConsumerConfiguration{
+        Consumer: formigo.NewMessageConsumer(formigo.MessageConsumerConfiguration{
             Handler: func(ctx context.Context, msg formigo.Message) error {
                 log.Println("Got Message", msg.Content())
 
@@ -180,7 +180,7 @@ By processing messages in batches, the worker can significantly enhance throughp
 | Concurrency   | Number of Go routines that process the messages from the Queue. Higher values are useful for slow I/O operations in the consumer's handler.     | 100           |
 | Retrievers    | Number of Go routines that retrieve messages from the Queue. Higher values are helpful for slow networks or when consumers are quicker.         | 1             |
 | ErrorConfig   | Defines the error threshold and interval for worker termination and error reporting function.                                                   | None          |
-| Consumer      | The message consumer, either SingleMessageConsumer or MultipleMessageConsumer.                                                                  | None          |
+| Consumer      | The message consumer, either MessageConsumer or MultipleMessageConsumer.                                                                        | None          |
 
 ## License
 

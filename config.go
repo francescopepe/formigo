@@ -52,8 +52,8 @@ type MultiMessageBufferConfiguration struct {
 	Timeout time.Duration
 }
 
-type SingleMessageConsumerConfiguration struct {
-	Handler singleMessageHandler
+type MessageConsumerConfiguration struct {
+	Handler messageHandler
 }
 
 type MultiMessageConsumerConfiguration struct {
