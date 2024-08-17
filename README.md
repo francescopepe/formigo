@@ -72,11 +72,11 @@ func main() {
         Client: sqsClient,
         Concurrency: 100,
         Consumer: formigo.NewSingleMessageConsumer(formigo.SingleMessageConsumerConfiguration{
-            Handler: func(ctx context.Context, msg interface{}) error {
-                log.Println("Got Message", msgs)
+            Handler: func(ctx context.Context, msg formigo.Message) error {
+                log.Println("Got Message", msg.Content())
 
                 // Assert the type of message to get the body or any other attributes
-                log.Println("Message body", *msg.(types.Message).Body)
+                log.Println("Message body", *msg.Content().(types.Message).Body)
 
                 return nil
             },
@@ -145,13 +145,13 @@ func main() {
                 Size:    100,
                 Timeout: time.Second * 5,
             },
-            Handler: func(ctx context.Context, msgs []interface{}) error {
+            Handler: func(ctx context.Context, msgs []formigo.Message) error {
                 log.Printf("Got %d messages to process\n", len(msgs)
 
                 // Assert the type of message to get the body or any other attributes
 
                 for i, msg := range msgs {
-                    log.Printf("Message %d body: %s", i, *msg.(types.Message).Body)
+                    log.Printf("Message %d body: %s", i, *msg.Content().(types.Message).Body)
                 }
 
                 return nil
@@ -174,13 +174,13 @@ By processing messages in batches, the worker can significantly enhance throughp
 
 ## Configuration
 
-| Configuration | Explanation | Default Value |
-|-------------- | ----------- | ------------- |
-| Client | The client is used for receiving messages from the queue and deleting them once they are processed correctly. This is a required configuration. | None |
-| Concurrency | Number of Go routines that process the messages from the Queue. Higher values are useful for slow I/O operations in the consumer's handler. | 100 |
-| Retrievers | Number of Go routines that retrieve messages from the Queue. Higher values are helpful for slow networks or when consumers are quicker. | 1 |
-| ErrorConfig | Defines the error threshold and interval for worker termination and error reporting function. | None |
-| Consumer | The message consumer, either SingleMessageConsumer or MultipleMessageConsumer. | None |
+| Configuration | Explanation                                                                                                                                     | Default Value |
+|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| Client        | The client is used for receiving messages from the queue and deleting them once they are processed correctly. This is a required configuration. | None          |
+| Concurrency   | Number of Go routines that process the messages from the Queue. Higher values are useful for slow I/O operations in the consumer's handler.     | 100           |
+| Retrievers    | Number of Go routines that retrieve messages from the Queue. Higher values are helpful for slow networks or when consumers are quicker.         | 1             |
+| ErrorConfig   | Defines the error threshold and interval for worker termination and error reporting function.                                                   | None          |
+| Consumer      | The message consumer, either SingleMessageConsumer or MultipleMessageConsumer.                                                                  | None          |
 
 ## License
 

@@ -6,9 +6,18 @@ import (
 )
 
 type Message struct {
-	Ctx       context.Context
-	CancelCtx context.CancelFunc
-	Msg       interface{}
+	Ctx          context.Context
+	CancelCtx    context.CancelFunc
+	Msg          interface{}
+	ReceivedTime time.Time
+}
+
+func (m Message) Content() interface{} {
+	return m.Msg
+}
+
+func (m Message) ReceivedAt() time.Time {
+	return m.ReceivedTime
 }
 
 type BufferConfiguration struct {

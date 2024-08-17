@@ -10,8 +10,8 @@ import (
 	"github.com/francescopepe/formigo/internal/messages"
 )
 
-type singleMessageHandler = func(ctx context.Context, msg interface{}) error
-type multiMessageHandler = func(ctx context.Context, msgs []interface{}) error
+type singleMessageHandler = func(ctx context.Context, msg Message) error
+type multiMessageHandler = func(ctx context.Context, msgs []Message) error
 
 // This means that the buffered messages didn't get passed to the handler within
 // the first message's timeout.
@@ -62,7 +62,7 @@ func (c *singleMessageConsumer) processMessage(msg messages.Message) error {
 
 	// Process Message
 	return wrapHandler(func() error {
-		return c.handler(msg.Ctx, msg.Msg)
+		return c.handler(msg.Ctx, msg)
 	})
 }
 
@@ -110,13 +110,15 @@ type multiMessageConsumer struct {
 }
 
 // It processes the messages and push them downstream for deletion.
-func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
-	msgs := make([]interface{}, 0, len(messages))
-	for _, msg := range messages {
-		msgs = append(msgs, msg.Msg)
-	}
+func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<- messages.Message, ctx context.Context, msgs []messages.Message) {
 	err := wrapHandler(func() error {
-		return c.handler(ctx, msgs)
+		// Convert slice to the abstraction
+		converted := make([]Message, len(msgs))
+		for _, msg := range msgs {
+			converted = append(converted, msg)
+		}
+
+		return c.handler(ctx, converted)
 	})
 	if err != nil {
 		ctrl.reportError(fmt.Errorf("failed to process messages: %w", err))
@@ -124,7 +126,7 @@ func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<-
 	}
 
 	// Push messages for deletion
-	for _, msg := range messages {
+	for _, msg := range msgs {
 		deleteCh <- msg
 	}
 }
