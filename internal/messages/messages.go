@@ -6,11 +6,11 @@ import (
 )
 
 type Message struct {
-	Ctx          context.Context
-	CancelCtx    context.CancelFunc
-	Msg          interface{}
-	MsgId        interface{}
-	ReceivedTime time.Time
+	Ctx          context.Context    `json:"-"` // Exclude from JSON
+	CancelCtx    context.CancelFunc `json:"-"` // Exclude from JSON
+	MsgId        interface{}        `json:"id"`
+	Msg          interface{}        `json:"content"`
+	ReceivedTime time.Time          `json:"receivedAt"`
 }
 
 func (m Message) Id() interface{} {
