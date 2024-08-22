@@ -10,8 +10,12 @@ import (
 	"github.com/francescopepe/formigo/internal/messages"
 )
 
-type singleMessageHandler = func(ctx context.Context, msg interface{}) error
-type multiMessageHandler = func(ctx context.Context, msgs []interface{}) error
+type BatchResponse struct {
+	FailedMessagesId []interface{}
+}
+
+type messageHandler = func(ctx context.Context, msg Message) error
+type batchHandler = func(ctx context.Context, msgs []Message) (BatchResponse, error)
 
 // This means that the buffered messages didn't get passed to the handler within
 // the first message's timeout.
@@ -49,31 +53,31 @@ func wrapHandler(handler func() error) (err error) {
 	return err
 }
 
-// singleMessageConsumer defines a message handler that consumes only one message at a
+// messageConsumer defines a message handler that consumes only one message at a
 // time.
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
-type singleMessageConsumer struct {
-	handler singleMessageHandler
+type messageConsumer struct {
+	handler messageHandler
 }
 
-func (c *singleMessageConsumer) processMessage(msg messages.Message) error {
+func (c *messageConsumer) processMessage(msg messages.Message) error {
 	defer msg.CancelCtx() // This must be called to release resources associated with the context.
 
 	// Process Message
 	return wrapHandler(func() error {
-		return c.handler(msg.Ctx, msg.Msg)
+		return c.handler(msg.Ctx, msg)
 	})
 }
 
 // Consumes and deletes a single message, it stops only when the `messageCh` gets closed
 // and doesn't have any messages in it.
-func (c *singleMessageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+func (c *messageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
 	consumers := makeAvailableConsumers(concurrency)
 
 	var wg sync.WaitGroup
 	for msg := range messageCh {
-		<-consumers // Use an available comsumer
+		<-consumers // Use an available consumer
 
 		wg.Add(1)
 		go func(message messages.Message) {
@@ -96,35 +100,41 @@ func (c *singleMessageConsumer) consume(concurrency int, ctrl *controller, messa
 	wg.Wait()
 }
 
-func NewSingleMessageConsumer(config SingleMessageConsumerConfiguration) *singleMessageConsumer {
-	return &singleMessageConsumer{
+func NewMessageConsumer(config MessageConsumerConfiguration) *messageConsumer {
+	return &messageConsumer{
 		handler: config.Handler,
 	}
 }
 
-// multiMessageConsumer allows to process multiple messages at a time. This can be useful
+// batchConsumer allows to process multiple messages at a time. This can be useful
 // for batch updates or use cases with high throughput.
-type multiMessageConsumer struct {
-	handler      multiMessageHandler
-	bufferConfig MultiMessageBufferConfiguration
+type batchConsumer struct {
+	handler      batchHandler
+	bufferConfig BatchConsumerBufferConfiguration
 }
 
 // It processes the messages and push them downstream for deletion.
-func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<- messages.Message, ctx context.Context, messages []messages.Message) {
-	msgs := make([]interface{}, 0, len(messages))
-	for _, msg := range messages {
-		msgs = append(msgs, msg.Msg)
-	}
-	err := wrapHandler(func() error {
-		return c.handler(ctx, msgs)
-	})
-	if err != nil {
-		ctrl.reportError(fmt.Errorf("failed to process messages: %w", err))
-		return
+func (c *batchConsumer) processMessages(ctrl *controller, deleteCh chan<- messages.Message, ctx context.Context, msgs []messages.Message) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctrl.reportError(fmt.Errorf("panic error: %s", r))
+		}
+	}()
+
+	// Convert slice to the abstraction
+	converted := make([]Message, 0, len(msgs))
+	for _, msg := range msgs {
+		converted = append(converted, msg)
 	}
 
+	resp, err := c.handler(ctx, converted)
+	if err != nil {
+		ctrl.reportError(fmt.Errorf("failed to process batch: %w", err))
+	}
+
+	toDelete := c.buildMessagesToDeleteFromBatchResponse(msgs, resp)
 	// Push messages for deletion
-	for _, msg := range messages {
+	for _, msg := range toDelete {
 		deleteCh <- msg
 	}
 }
@@ -132,7 +142,7 @@ func (c *multiMessageConsumer) processMessages(ctrl *controller, deleteCh chan<-
 // Consumes and deletes a number of messages in the interval [1, N] based on configuration
 // provided in the BufferConfiguration.
 // It stops only when the messageCh gets closed and doesn't have any messages in it.
-func (c *multiMessageConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
+func (c *batchConsumer) consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message) {
 	consumers := makeAvailableConsumers(concurrency)
 
 	// Create buffer
@@ -208,7 +218,28 @@ func (c *multiMessageConsumer) consume(concurrency int, ctrl *controller, messag
 	wg.Wait()
 }
 
-func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *multiMessageConsumer {
+func (c *batchConsumer) buildMessagesToDeleteFromBatchResponse(msgs []messages.Message, resp BatchResponse) []messages.Message {
+	if len(resp.FailedMessagesId) == 0 {
+		return msgs
+	}
+
+	toDelete := make([]messages.Message, 0, len(msgs))
+
+	failedMessagesIdIndexed := make(map[interface{}]struct{}, len(resp.FailedMessagesId))
+	for _, id := range resp.FailedMessagesId {
+		failedMessagesIdIndexed[id] = struct{}{}
+	}
+
+	for _, msg := range msgs {
+		if _, ok := failedMessagesIdIndexed[msg.Id()]; !ok {
+			toDelete = append(toDelete, msg)
+		}
+	}
+
+	return toDelete
+}
+
+func NewBatchConsumer(config BatchConsumerConfiguration) *batchConsumer {
 	if config.BufferConfig.Size == 0 {
 		config.BufferConfig.Size = 10
 	}
@@ -217,7 +248,7 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *multiMes
 		config.BufferConfig.Timeout = time.Second
 	}
 
-	return &multiMessageConsumer{
+	return &batchConsumer{
 		handler:      config.Handler,
 		bufferConfig: config.BufferConfig,
 	}
@@ -225,6 +256,6 @@ func NewMultiMessageConsumer(config MultiMessageConsumerConfiguration) *multiMes
 
 // Interface guards
 var (
-	_ consumer = (*singleMessageConsumer)(nil)
-	_ consumer = (*multiMessageConsumer)(nil)
+	_ consumer = (*messageConsumer)(nil)
+	_ consumer = (*batchConsumer)(nil)
 )
