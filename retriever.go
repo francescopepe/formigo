@@ -17,8 +17,14 @@ func retriever(ctx context.Context, receiver client.MessageReceiver, ctrl *contr
 		case <-ctx.Done():
 			return
 		default:
-			msgs, err := receiver.ReceiveMessages()
+			msgs, err := receiver.ReceiveMessages(ctx)
 			if err != nil {
+				if errors.Is(err, context.Canceled) && errors.Is(ctx.Err(), context.Canceled) {
+					// The worker's context was canceled. We can exit.
+					return
+				}
+
+				// Report the error to the controller and continue.
 				ctrl.reportError(fmt.Errorf("unable to receive message: %w", err))
 				continue
 			}

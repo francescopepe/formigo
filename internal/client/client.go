@@ -1,9 +1,13 @@
 package client
 
-import "github.com/francescopepe/formigo/internal/messages"
+import (
+	"context"
+
+	"github.com/francescopepe/formigo/internal/messages"
+)
 
 type MessageReceiver interface {
-	ReceiveMessages() ([]messages.Message, error)
+	ReceiveMessages(ctx context.Context) ([]messages.Message, error)
 }
 
 type MessageDeleter interface {

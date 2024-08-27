@@ -35,8 +35,8 @@ type sqsClient struct {
 	messageCtxTimeout   time.Duration
 }
 
-func (c sqsClient) ReceiveMessages() ([]messages.Message, error) {
-	out, err := c.svc.ReceiveMessage(context.Background(), c.receiveMessageInput)
+func (c sqsClient) ReceiveMessages(ctx context.Context) ([]messages.Message, error) {
+	out, err := c.svc.ReceiveMessage(ctx, c.receiveMessageInput)
 	if err != nil {
 		return nil, fmt.Errorf("unable to receive messages: %w", err)
 	}
