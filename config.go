@@ -53,11 +53,11 @@ type BatchConsumerBufferConfiguration struct {
 }
 
 type MessageConsumerConfiguration struct {
-	Handler messageHandler
+	Handler MessageHandler
 }
 
 type BatchConsumerConfiguration struct {
-	Handler      batchHandler
+	Handler      BatchHandler
 	BufferConfig BatchConsumerBufferConfiguration
 }
 
@@ -83,7 +83,7 @@ type Configuration struct {
 	ErrorConfig ErrorConfiguration
 
 	// The messages Consumer.
-	Consumer consumer
+	Consumer Consumer
 
 	// Configuration for the deleter
 	DeleterConfig DeleterConfiguration

@@ -9,16 +9,16 @@ import (
 	"github.com/francescopepe/formigo/internal/messages"
 )
 
-type worker struct {
+type Worker struct {
 	client        client.Client
 	concurrency   int
 	retrievers    int
 	errorConfig   ErrorConfiguration
-	consumer      consumer
+	consumer      Consumer
 	deleterConfig DeleterConfiguration
 }
 
-func (w worker) Run(ctx context.Context) error {
+func (w Worker) Run(ctx context.Context) error {
 	// Create a new context with a cancel function used to stop the worker from the
 	// controller in case too many errors occur.
 	ctx, cancel := context.WithCancelCause(ctx)
@@ -60,7 +60,7 @@ func (w worker) Run(ctx context.Context) error {
 // It returns a channel where the messages will be published and, only when all the
 // retrievers have stopped, it will close it to broadcast the signal to stop to the
 // consumers.
-func (w worker) runRetrievers(ctx context.Context, ctrl *controller) <-chan messages.Message {
+func (w Worker) runRetrievers(ctx context.Context, ctrl *controller) <-chan messages.Message {
 	messageCh := make(chan messages.Message)
 
 	var wg sync.WaitGroup
@@ -84,7 +84,7 @@ func (w worker) runRetrievers(ctx context.Context, ctrl *controller) <-chan mess
 // It returns a channel where the messages will be published for deletion and,
 // only when the consumer has stopped, it will close it to broadcast the
 // signal to stop to the deleter.
-func (w worker) runConsumer(ctrl *controller, messageCh <-chan messages.Message) <-chan messages.Message {
+func (w Worker) runConsumer(ctrl *controller, messageCh <-chan messages.Message) <-chan messages.Message {
 	deleteCh := make(chan messages.Message)
 
 	go func() {
@@ -96,10 +96,10 @@ func (w worker) runConsumer(ctrl *controller, messageCh <-chan messages.Message)
 	return deleteCh
 }
 
-func NewWorker(config Configuration) worker {
+func NewWorker(config Configuration) Worker {
 	config = setWorkerConfigValues(config)
 
-	return worker{
+	return Worker{
 		client:        config.Client,
 		concurrency:   config.Concurrency,
 		retrievers:    config.Retrievers,
