@@ -14,8 +14,8 @@ type BatchResponse struct {
 	FailedMessagesId []interface{}
 }
 
-type messageHandler = func(ctx context.Context, msg Message) error
-type batchHandler = func(ctx context.Context, msgs []Message) (BatchResponse, error)
+type MessageHandler = func(ctx context.Context, msg Message) error
+type BatchHandler = func(ctx context.Context, msgs []Message) (BatchResponse, error)
 
 // This means that the buffered messages didn't get passed to the handler within
 // the first message's timeout.
@@ -25,7 +25,7 @@ type batchHandler = func(ctx context.Context, msgs []Message) (BatchResponse, er
 // - Consumer to slow
 var errBufferCtxExpired = errors.New("buffer context expired, buffer will Reset")
 
-type consumer interface {
+type Consumer interface {
 	consume(concurrency int, ctrl *controller, messageCh <-chan messages.Message, deleteCh chan<- messages.Message)
 }
 
@@ -58,7 +58,7 @@ func wrapHandler(handler func() error) (err error) {
 // It can be useful when the workload is specific per message, for example for sending
 // an email.
 type messageConsumer struct {
-	handler messageHandler
+	handler MessageHandler
 }
 
 func (c *messageConsumer) processMessage(msg messages.Message) error {
@@ -109,7 +109,7 @@ func NewMessageConsumer(config MessageConsumerConfiguration) *messageConsumer {
 // batchConsumer allows to process multiple messages at a time. This can be useful
 // for batch updates or use cases with high throughput.
 type batchConsumer struct {
-	handler      batchHandler
+	handler      BatchHandler
 	bufferConfig BatchConsumerBufferConfiguration
 }
 
@@ -256,6 +256,6 @@ func NewBatchConsumer(config BatchConsumerConfiguration) *batchConsumer {
 
 // Interface guards
 var (
-	_ consumer = (*messageConsumer)(nil)
-	_ consumer = (*batchConsumer)(nil)
+	_ Consumer = (*messageConsumer)(nil)
+	_ Consumer = (*batchConsumer)(nil)
 )
